@@ -1,0 +1,621 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { FileUpload } from "@/components/file-upload"
+import { createClient } from "@/utils/supabase/client"
+import { toast } from "sonner"
+import { BarChart3, FileText, Package, PackageOpen, MessageSquare } from "lucide-react"
+
+type FormData = {
+  // Bukti Kas & Bank
+  buktiDokumen?: string
+  nomorVoucher?: string
+  uraianPerihal?: string
+  penerima?: string
+  nominal?: number
+  dibuatOleh?: string
+  tanggal?: string
+  
+  // Bukti Penerimaan Barang
+  diterimaDari?: string
+  nomor?: string
+  jenisBarang?: string
+  
+  // Bukti Pengeluaran Barang
+  kebun?: string
+  bagian?: string
+  tanggalDiminta?: string
+  
+  // Memorandum
+  nomorSurat?: string
+  dari?: string
+  perihal?: string
+  
+  // Arsip Dokumen Lain
+  jenisDokumen?: string
+  
+  // Common
+  fileUrl?: string
+  fileName?: string
+}
+
+export default function TataUsahaKeuanganPage() {
+  const [activeCard, setActiveCard] = useState<string | null>(null)
+  const [formData, setFormData] = useState<FormData>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showKasBankOptions, setShowKasBankOptions] = useState(false)
+  const [stats, setStats] = useState([
+    { title: "Bukti Kas & Bank", value: 0, icon: BarChart3, color: "bg-blue-100 text-blue-700", table: "bukti_kas_bank", cardId: "bukti-kas-bank" },
+    { title: "Bukti Penerimaan Barang", value: 0, icon: Package, color: "bg-green-100 text-green-700", table: "bukti_penerimaan_barang", cardId: "bukti-penerimaan-barang" },
+    { title: "Bukti Pengeluaran Barang", value: 0, icon: PackageOpen, color: "bg-purple-100 text-purple-700", table: "bukti_pengeluaran_barang", cardId: "bukti-pengeluaran-barang" },
+    { title: "Memorandum", value: 0, icon: MessageSquare, color: "bg-yellow-100 text-yellow-700", table: "memorandum", cardId: "memorandum" },
+    { title: "Arsip Dokumen Lain", value: 0, icon: FileText, color: "bg-pink-100 text-pink-700", table: "arsip_dokumen_lain", cardId: "arsip-dokumen-lain" },
+  ])
+  const supabase = createClient()
+
+  // Fetch statistics on component mount
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const updatedStats = await Promise.all(
+          stats.map(async (stat) => {
+            const { count, error } = await supabase
+              .from(stat.table)
+              .select('*', { count: 'exact', head: true })
+            
+            if (error) {
+              console.error(`Error fetching ${stat.table}:`, error)
+              return stat
+            }
+            
+            return { ...stat, value: count || 0 }
+          })
+        )
+        setStats(updatedStats)
+      } catch (error) {
+        console.error('Error fetching statistics:', error)
+      }
+    }
+
+    fetchStats()
+  }, [])
+
+  const handleCardClick = (cardId: string) => {
+    if (cardId === 'bukti-kas-bank') {
+      setShowKasBankOptions(true)
+      setActiveCard(cardId)
+    } else {
+      setActiveCard(cardId)
+      setFormData({})
+    }
+  }
+
+  const handleKasBankOptionSelect = (option: string) => {
+    setFormData({ buktiDokumen: option })
+    setShowKasBankOptions(false)
+  }
+
+  const handleInputChange = (field: string, value: string | number) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleFileUpload = (fileUrl: string, fileName: string) => {
+    setFormData(prev => ({ ...prev, fileUrl, fileName }))
+  }
+
+  const handleSubmit = async (type: string) => {
+    setIsSubmitting(true)
+    try {
+      let tableName = ''
+      let data = { ...formData }
+      
+      switch (type) {
+        case 'bukti-kas-bank':
+          tableName = 'bukti_kas_bank'
+          break
+        case 'bukti-penerimaan-barang':
+          tableName = 'bukti_penerimaan_barang'
+          break
+        case 'bukti-pengeluaran-barang':
+          tableName = 'bukti_pengeluaran_barang'
+          break
+        case 'memorandum':
+          tableName = 'memorandum'
+          break
+        case 'arsip-dokumen-lain':
+          tableName = 'arsip_dokumen_lain'
+          break
+      }
+      
+      const { error } = await supabase
+        .from(tableName)
+        .insert([data])
+      
+      if (error) throw error
+      
+      toast.success('Data berhasil disimpan!')
+      setFormData({})
+      setActiveCard(null)
+      setShowKasBankOptions(false)
+      
+      // Update stats after successful submission
+      setStats(prevStats => 
+        prevStats.map(stat => 
+          stat.table === tableName 
+            ? { ...stat, value: stat.value + 1 }
+            : stat
+        )
+      )
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('Gagal menyimpan data')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({})
+    setActiveCard(null)
+    setShowKasBankOptions(false)
+  }
+
+  return (
+    <div className="space-y-6">
+      <h1 className="text-2xl font-bold">Arsip Tata Usaha & Keuangan</h1>
+
+      {/* Statistics Cards - Now Clickable */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8">
+        {stats.map((stat) => (
+          <Card 
+            key={stat.title} 
+            className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200"
+            onClick={() => handleCardClick(stat.cardId)}
+          >
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
+              <div className={`p-2 rounded-full ${stat.color}`}>
+                <stat.icon className="h-4 w-4" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stat.value}</div>
+              <p className="text-xs text-muted-foreground">Klik untuk tambah data</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Bukti Kas & Bank Options Modal */}
+      {showKasBankOptions && activeCard === 'bukti-kas-bank' && (
+        <Card className="border-2 border-blue-500">
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              Pilih Jenis Bukti Kas & Bank
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowKasBankOptions(false)
+                  setActiveCard(null)
+                }}
+              >
+                Tutup
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button 
+                variant="outline" 
+                className="h-20 text-left flex flex-col items-start justify-center"
+                onClick={() => handleKasBankOptionSelect('penerimaan-kas')}
+              >
+                <span className="font-semibold">Bukti Penerimaan Kas</span>
+                <span className="text-sm text-muted-foreground">Untuk mencatat penerimaan kas</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-20 text-left flex flex-col items-start justify-center"
+                onClick={() => handleKasBankOptionSelect('pengeluaran-kas')}
+              >
+                <span className="font-semibold">Bukti Pengeluaran Kas</span>
+                <span className="text-sm text-muted-foreground">Untuk mencatat pengeluaran kas</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Form Cards */}
+      {activeCard === 'bukti-kas-bank' && !showKasBankOptions && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              Bukti Kas & Bank - {formData.buktiDokumen === 'penerimaan-kas' ? 'Penerimaan Kas' : 'Pengeluaran Kas'}
+              <Button variant="outline" onClick={resetForm}>
+                Tutup
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="buktiDokumen">Bukti Dokumen</Label>
+                <Select 
+                  value={formData.buktiDokumen || ''}
+                  onValueChange={(value) => handleInputChange('buktiDokumen', value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Pilih jenis bukti" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="penerimaan-kas">Bukti Penerimaan Kas</SelectItem>
+                    <SelectItem value="pengeluaran-kas">Bukti Pengeluaran Kas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="nomorVoucher">Nomor Voucher</Label>
+                <Input 
+                  id="nomorVoucher"
+                  value={formData.nomorVoucher || ''}
+                  onChange={(e) => handleInputChange('nomorVoucher', e.target.value)}
+                  placeholder="Masukkan nomor voucher"
+                />
+              </div>
+              <div>
+                <Label htmlFor="uraianPerihal">Uraian/Perihal</Label>
+                <Textarea 
+                  id="uraianPerihal"
+                  value={formData.uraianPerihal || ''}
+                  onChange={(e) => handleInputChange('uraianPerihal', e.target.value)}
+                  placeholder="Masukkan uraian/perihal"
+                />
+              </div>
+              <div>
+                <Label htmlFor="penerima">Penerima</Label>
+                <Input 
+                  id="penerima"
+                  value={formData.penerima || ''}
+                  onChange={(e) => handleInputChange('penerima', e.target.value)}
+                  placeholder="Masukkan nama penerima"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nominal">Nominal</Label>
+                <Input 
+                  id="nominal"
+                  type="number"
+                  value={formData.nominal || ''}
+                  onChange={(e) => handleInputChange('nominal', parseFloat(e.target.value))}
+                  placeholder="Masukkan nominal"
+                />
+              </div>
+              <div>
+                <Label htmlFor="dibuatOleh">Dibuat Oleh</Label>
+                <Input 
+                  id="dibuatOleh"
+                  value={formData.dibuatOleh || ''}
+                  onChange={(e) => handleInputChange('dibuatOleh', e.target.value)}
+                  placeholder="Masukkan nama pembuat"
+                />
+              </div>
+              <div>
+                <Label htmlFor="tanggal">Tanggal</Label>
+                <Input 
+                  id="tanggal"
+                  type="date"
+                  value={formData.tanggal || ''}
+                  onChange={(e) => handleInputChange('tanggal', e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>File Upload</Label>
+              <FileUpload 
+                onUploadComplete={handleFileUpload}
+                folder="tata-usaha-keuangan/bukti-kas-bank"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleSubmit('bukti-kas-bank')}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+              <Button variant="outline" onClick={resetForm}>
+                Batal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card 2: Bukti Penerimaan Barang */}
+      {activeCard === 'bukti-penerimaan-barang' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              Bukti Penerimaan Barang
+              <Button variant="outline" onClick={resetForm}>
+                Tutup
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="diterimaDari">Diterima dari</Label>
+                <Input 
+                  id="diterimaDari"
+                  value={formData.diterimaDari || ''}
+                  onChange={(e) => handleInputChange('diterimaDari', e.target.value)}
+                  placeholder="Masukkan asal barang"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nomor">Nomor</Label>
+                <Input 
+                  id="nomor"
+                  value={formData.nomor || ''}
+                  onChange={(e) => handleInputChange('nomor', e.target.value)}
+                  placeholder="Masukkan nomor"
+                />
+              </div>
+              <div>
+                <Label htmlFor="tanggal">Tanggal</Label>
+                <Input 
+                  id="tanggal"
+                  type="date"
+                  value={formData.tanggal || ''}
+                  onChange={(e) => handleInputChange('tanggal', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="jenisBarang">Jenis Barang</Label>
+                <Input 
+                  id="jenisBarang"
+                  value={formData.jenisBarang || ''}
+                  onChange={(e) => handleInputChange('jenisBarang', e.target.value)}
+                  placeholder="Masukkan jenis barang"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>File Upload</Label>
+              <FileUpload 
+                onUploadComplete={handleFileUpload}
+                folder="tata-usaha-keuangan/bukti-penerimaan-barang"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleSubmit('bukti-penerimaan-barang')}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+              <Button variant="outline" onClick={resetForm}>
+                Batal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card 3: Bukti Pengeluaran Barang */}
+      {activeCard === 'bukti-pengeluaran-barang' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              Bukti Pengeluaran Barang
+              <Button variant="outline" onClick={resetForm}>
+                Tutup
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="kebun">Kebun</Label>
+                <Input 
+                  id="kebun"
+                  value={formData.kebun || ''}
+                  onChange={(e) => handleInputChange('kebun', e.target.value)}
+                  placeholder="Masukkan nama kebun"
+                />
+              </div>
+              <div>
+                <Label htmlFor="bagian">Bagian</Label>
+                <Input 
+                  id="bagian"
+                  value={formData.bagian || ''}
+                  onChange={(e) => handleInputChange('bagian', e.target.value)}
+                  placeholder="Masukkan bagian"
+                />
+              </div>
+              <div>
+                <Label htmlFor="nomor">Nomor</Label>
+                <Input 
+                  id="nomor"
+                  value={formData.nomor || ''}
+                  onChange={(e) => handleInputChange('nomor', e.target.value)}
+                  placeholder="Masukkan nomor"
+                />
+              </div>
+              <div>
+                <Label htmlFor="tanggalDiminta">Tanggal Diminta</Label>
+                <Input 
+                  id="tanggalDiminta"
+                  type="date"
+                  value={formData.tanggalDiminta || ''}
+                  onChange={(e) => handleInputChange('tanggalDiminta', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="jenisBarang">Jenis Barang</Label>
+                <Input 
+                  id="jenisBarang"
+                  value={formData.jenisBarang || ''}
+                  onChange={(e) => handleInputChange('jenisBarang', e.target.value)}
+                  placeholder="Masukkan jenis barang"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>File Upload</Label>
+              <FileUpload 
+                onUploadComplete={handleFileUpload}
+                folder="tata-usaha-keuangan/bukti-pengeluaran-barang"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleSubmit('bukti-pengeluaran-barang')}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+              <Button variant="outline" onClick={resetForm}>
+                Batal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card 4: Memorandum */}
+      {activeCard === 'memorandum' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              Memorandum
+              <Button variant="outline" onClick={resetForm}>
+                Tutup
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="nomorSurat">Nomor Surat</Label>
+                <Input 
+                  id="nomorSurat"
+                  value={formData.nomorSurat || ''}
+                  onChange={(e) => handleInputChange('nomorSurat', e.target.value)}
+                  placeholder="Masukkan nomor surat"
+                />
+              </div>
+              <div>
+                <Label htmlFor="dari">Dari</Label>
+                <Input 
+                  id="dari"
+                  value={formData.dari || ''}
+                  onChange={(e) => handleInputChange('dari', e.target.value)}
+                  placeholder="Masukkan pengirim"
+                />
+              </div>
+              <div>
+                <Label htmlFor="tanggal">Tanggal</Label>
+                <Input 
+                  id="tanggal"
+                  type="date"
+                  value={formData.tanggal || ''}
+                  onChange={(e) => handleInputChange('tanggal', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="perihal">Perihal</Label>
+                <Textarea 
+                  id="perihal"
+                  value={formData.perihal || ''}
+                  onChange={(e) => handleInputChange('perihal', e.target.value)}
+                  placeholder="Masukkan perihal"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>File Upload</Label>
+              <FileUpload 
+                onUploadComplete={handleFileUpload}
+                folder="tata-usaha-keuangan/memorandum"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleSubmit('memorandum')}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+              <Button variant="outline" onClick={resetForm}>
+                Batal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Card 5: Arsip Dokumen Lain */}
+      {activeCard === 'arsip-dokumen-lain' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex justify-between items-center">
+              Arsip Dokumen Lain
+              <Button variant="outline" onClick={resetForm}>
+                Tutup
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="tanggal">Tanggal</Label>
+                <Input 
+                  id="tanggal"
+                  type="date"
+                  value={formData.tanggal || ''}
+                  onChange={(e) => handleInputChange('tanggal', e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="jenisDokumen">Jenis Dokumen</Label>
+                <Input 
+                  id="jenisDokumen"
+                  value={formData.jenisDokumen || ''}
+                  onChange={(e) => handleInputChange('jenisDokumen', e.target.value)}
+                  placeholder="Masukkan jenis dokumen"
+                />
+              </div>
+            </div>
+            <div>
+              <Label>File Upload</Label>
+              <FileUpload 
+                onUploadComplete={handleFileUpload}
+                folder="tata-usaha-keuangan/arsip-dokumen-lain"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleSubmit('arsip-dokumen-lain')}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+              <Button variant="outline" onClick={resetForm}>
+                Batal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
