@@ -9,6 +9,8 @@ type Profile = {
   full_name: string
   avatar_url: string
   role: string
+  nik?: string
+  email?: string
 }
 
 export function useAuth() {

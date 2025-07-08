@@ -6,7 +6,7 @@ import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Lock, Mail } from "lucide-react"
+import { Lock, Mail, User } from "lucide-react"
 import { createClient } from "@/utils/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -15,7 +15,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/components/ui/use-toast"
 
 export function LoginForm() {
-  const [email, setEmail] = useState("")
+  const [emailOrNik, setEmailOrNik] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -27,13 +27,38 @@ export function LoginForm() {
     setLoading(true)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
+      let loginResult
+      
+      // Check if input is email (contains @) or NIK
+      const isEmail = emailOrNik.includes('@')
+      
+      if (isEmail) {
+        // Login with email
+        loginResult = await supabase.auth.signInWithPassword({
+          email: emailOrNik,
+          password,
+        })
+      } else {
+        // Login with NIK - first find the user's email from profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('nik', emailOrNik)
+          .single()
+        
+        if (profileError || !profile) {
+          throw new Error('NIK tidak ditemukan')
+        }
+        
+        // Login with the found email
+        loginResult = await supabase.auth.signInWithPassword({
+          email: profile.email,
+          password,
+        })
+      }
 
-      if (error) {
-        throw error
+      if (loginResult.error) {
+        throw loginResult.error
       }
 
       toast({
@@ -97,17 +122,17 @@ export function LoginForm() {
         </CardHeader>
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">
-              Email
+            <Label htmlFor="emailOrNik" className="text-sm font-medium">
+              Email atau NIK
             </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
+              <User className="absolute left-3 top-2.5 h-5 w-5 text-muted-foreground" />
               <Input
-                id="email"
-                type="email"
-                placeholder="Email anda"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="emailOrNik"
+                type="text"
+                placeholder="Email atau NIK anda"
+                value={emailOrNik}
+                onChange={(e) => setEmailOrNik(e.target.value)}
                 className="pl-10"
                 required
               />
@@ -118,7 +143,7 @@ export function LoginForm() {
               <Label htmlFor="password" className="text-sm font-medium">
                 Password
               </Label>
-              <Link href="#" className="text-xs text-green-600 hover:text-green-700">
+              <Link href="#" className="text-sm text-green-600 hover:text-green-700">
                 Lupa password?
               </Link>
             </div>

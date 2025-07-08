@@ -47,6 +47,7 @@ type HistoryItem = {
 }
 
 export default function TataUsahaKeuanganPage() {
+  const [viewMode, setViewMode] = useState<'form' | 'history' | null>(null)
   const [activeCard, setActiveCard] = useState<string | null>(null)
   const [activeSubOption, setActiveSubOption] = useState<string | null>(null)
   const [formData, setFormData] = useState<FormData>({})
@@ -136,17 +137,23 @@ export default function TataUsahaKeuanganPage() {
   }
 
   const handleCardClick = (cardType: string) => {
-    console.log('Card clicked:', cardType, 'Current activeCard:', activeCard)
-    setFormData({})
-    setActiveSubOption(null)
-    // Ganti semua underscore dengan dash
     const formattedCardType = cardType.replace(/_/g, '-')
-    setActiveCard(activeCard === formattedCardType ? null : formattedCardType)
+    if (activeCard === formattedCardType) {
+      // Toggle antara form dan history untuk card yang sama
+      setViewMode(viewMode === 'form' ? 'history' : 'form')
+    } else {
+      // Card baru diklik, mulai dengan history
+      setActiveCard(formattedCardType)
+      setViewMode('history')
+      setFormData({})
+      setActiveSubOption(null)
+    }
   }
 
   const handleSubOptionSelect = (option: string) => {
     setActiveSubOption(option)
     setFormData(prev => ({ ...prev, bukti_dokumen: option }))
+    setViewMode('form')
   }
 
   const handleSubmit = async (type: string) => {
@@ -224,8 +231,8 @@ export default function TataUsahaKeuanganPage() {
       
       const uploadedFile = { file_url: formData.file_url, file_name: formData.file_name }
       setFormData({})
-      setActiveCard(null)
       setActiveSubOption(null)
+      setViewMode('history') // Kembali ke history setelah submit
       
       if (uploadedFile.file_name) {
         toast.success(`File ${uploadedFile.file_name} berhasil diarsipkan`)
@@ -272,8 +279,8 @@ export default function TataUsahaKeuanganPage() {
     }
     
     setFormData({})
-    setActiveCard(null)
     setActiveSubOption(null)
+    setViewMode('form') // Kembali ke form mode
   }
 
   const renderDetail = (item: HistoryItem) => {
@@ -299,6 +306,11 @@ export default function TataUsahaKeuanganPage() {
   }
 
   const filteredHistory = history.filter(item => {
+    if (activeCard) {
+      const activeTable = activeCard.replace(/-/g, '_')
+      if (item.table !== activeTable) return false
+    }
+    
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     const type = stats.find(stat => stat.table === item.table)?.title.toLowerCase() || ''
@@ -321,8 +333,8 @@ export default function TataUsahaKeuanganPage() {
         {stats.map((stat) => (
           <Card 
             key={stat.table} 
-            className={`overflow-hidden cursor-pointer hover:bg-gray-50 transition-colors ${activeCard === stat.table.replace('_', '-') ? 'border-500 border-2' : ''}`}
-            onClick={() => handleCardClick(stat.table.replace('_', '-'))}
+            className={`overflow-hidden cursor-pointer hover:bg-gray-50 transition-colors ${activeCard === stat.table.replace('_', '-') ? 'border-blue-500 border-2' : ''}`}
+            onClick={() => handleCardClick(stat.table)}
           >
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
               <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
@@ -338,8 +350,26 @@ export default function TataUsahaKeuanganPage() {
         ))}
       </div>
 
+      {/* Toggle Buttons */}
+      {activeCard && (
+        <div className="flex gap-2 mb-4">
+          <Button 
+            variant={viewMode === 'form' ? 'default' : 'outline'}
+            onClick={() => setViewMode('form')}
+          >
+            Form Pengisian
+          </Button>
+          <Button 
+            variant={viewMode === 'history' ? 'default' : 'outline'}
+            onClick={() => setViewMode('history')}
+          >
+            Riwayat Upload
+          </Button>
+        </div>
+      )}
+
       {/* Form: Bukti Kas & Bank */}
-      {activeCard === 'bukti-kas-bank' && (
+      {activeCard === 'bukti-kas-bank' && viewMode === 'form' && (
         <Card>
           <CardHeader>
             <CardTitle>Bukti Kas & Bank</CardTitle>
@@ -472,7 +502,7 @@ export default function TataUsahaKeuanganPage() {
       )}
 
       {/* Form: Bukti Penerimaan Barang */}
-      {activeCard === 'bukti-penerimaan-barang' && (
+      {activeCard === 'bukti-penerimaan-barang' && viewMode === 'form' && (
         <Card>
           <CardHeader>
             <CardTitle>Bukti Penerimaan Barang</CardTitle>
@@ -546,7 +576,7 @@ export default function TataUsahaKeuanganPage() {
       )}
 
       {/* Form: Bukti Pengeluaran Barang */}
-      {activeCard === 'bukti-pengeluaran-barang' && (
+      {activeCard === 'bukti-pengeluaran-barang' && viewMode === 'form' && (
         <Card>
           <CardHeader>
             <CardTitle>Bukti Pengeluaran Barang</CardTitle>
@@ -629,7 +659,7 @@ export default function TataUsahaKeuanganPage() {
       )}
 
       {/* Form: Memorandum */}
-      {activeCard === 'memorandum' && (
+      {activeCard === 'memorandum' && viewMode === 'form' && (
         <Card>
           <CardHeader>
             <CardTitle>Memorandum</CardTitle>
@@ -704,7 +734,7 @@ export default function TataUsahaKeuanganPage() {
       )}
 
       {/* Form: Arsip Dokumen Lain */}
-      {activeCard === 'arsip-dokumen-lain' && (
+      {activeCard === 'arsip-dokumen-lain' && viewMode === 'form' && (
         <Card>
           <CardHeader>
             <CardTitle>Arsip Dokumen Lain</CardTitle>
@@ -720,7 +750,7 @@ export default function TataUsahaKeuanganPage() {
                   placeholder="Masukkan jenis dokumen"
                 />
               </div>
-              <div>
+              {/* <div>
                 <Label htmlFor="nomor">Nomor</Label>
                 <Input 
                   id="nomor"
@@ -728,7 +758,7 @@ export default function TataUsahaKeuanganPage() {
                   onChange={(e) => handleInputChange('nomor', e.target.value)}
                   placeholder="Masukkan nomor dokumen"
                 />
-              </div>
+              </div> */}
               <div>
                 <Label htmlFor="tanggal">Tanggal</Label>
                 <Input 
@@ -779,67 +809,71 @@ export default function TataUsahaKeuanganPage() {
       )}
 
       {/* History Section */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Riwayat Dokumen</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4 flex items-center gap-2">
-            <Search className="h-4 w-4 text-gray-500" />
-            <Input
-              placeholder="Cari jenis, nomor, file, dll..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="max-w-md"
-            />
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Jenis Dokumen</TableHead>
-                <TableHead>Nomor</TableHead>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>File</TableHead>
-                <TableHead>Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredHistory.map(item => (
-                <TableRow key={`${item.table}-${item.id}`}>
-                  <TableCell>
-                    {stats.find(stat => stat.table === item.table)?.title || item.table}
-                  </TableCell>
-                  <TableCell>{item.nomor || '-'}</TableCell>
-                  <TableCell>{new Date(item.tanggal).toLocaleDateString('id-ID')}</TableCell>
-                  <TableCell>{item.file_name || '-'}</TableCell>
-                  <TableCell>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Eye className="h-4 w-4 mr-1" /> Detail
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Detail Dokumen</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {renderDetail(item)}
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
+      {activeCard && viewMode === 'history' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              Riwayat Dokumen - {stats.find(stat => stat.table === activeCard.replace('-', '_'))?.title}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 flex items-center gap-2">
+              <Search className="h-4 w-4 text-gray-500" />
+              <Input
+                placeholder="Cari jenis, nomor, file, dll..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="max-w-md"
+              />
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Jenis Dokumen</TableHead>
+                  <TableHead>Nomor</TableHead>
+                  <TableHead>Tanggal</TableHead>
+                  <TableHead>File</TableHead>
+                  <TableHead>Aksi</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {filteredHistory.length === 0 && (
-            <p className="text-center text-muted-foreground mt-4">
-              {searchQuery ? "Tidak ada dokumen yang sesuai dengan pencarian." : "Belum ada dokumen yang diunggah."}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+              </TableHeader>
+              <TableBody>
+                {filteredHistory.map(item => (
+                  <TableRow key={`${item.table}-${item.id}`}>
+                    <TableCell>
+                      {stats.find(stat => stat.table === item.table)?.title || item.table}
+                    </TableCell>
+                    <TableCell>{item.nomor || '-'}</TableCell>
+                    <TableCell>{new Date(item.tanggal).toLocaleDateString('id-ID')}</TableCell>
+                    <TableCell>{item.file_name || '-'}</TableCell>
+                    <TableCell>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-4 w-4 mr-1" /> Detail
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Detail Dokumen</DialogTitle>
+                          </DialogHeader>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {renderDetail(item)}
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            {filteredHistory.length === 0 && (
+              <p className="text-center text-muted-foreground mt-4">
+                {searchQuery ? "Tidak ada dokumen yang sesuai dengan pencarian." : "Belum ada dokumen yang diunggah."}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
