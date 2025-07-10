@@ -31,6 +31,7 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  useSidebar
 } from "@/components/ui/sidebar"
 
 const fileUploadItems = [
@@ -46,10 +47,18 @@ const fileUploadItems = [
 export function AppSidebar() {
   const pathname = usePathname()
   const supabase = createClient()
+  const { isMobile, setOpenMobile } = useSidebar()
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     window.location.href = "/"
+  }
+
+  // Tutup sidebar mobile saat item menu diklik
+  const handleMenuItemClick = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
   }
 
   return (
@@ -68,7 +77,7 @@ export function AppSidebar() {
             <Image src="/images/logo-ptpn4.png" alt="Logo PTPN 4" fill className="object-contain" />
           </div>
         </div>
-        <Link href="/dashboard" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2" onClick={handleMenuItemClick}>
           <Archive className="h-6 w-6 text-white" />
           <span className="font-bold text-xl text-white">SIPETA</span>
         </Link>
@@ -76,7 +85,7 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === "/dashboard"}>
+            <SidebarMenuButton asChild isActive={pathname === "/dashboard"} onClick={handleMenuItemClick}>
               <Link href="/dashboard">
                 <Home className="h-5 w-5" />
                 <span>Dashboard</span>
@@ -85,7 +94,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === "/dashboard/users"}>
+            <SidebarMenuButton asChild isActive={pathname === "/dashboard/users"} onClick={handleMenuItemClick}>
               <Link href="/dashboard/users">
                 <Users className="h-5 w-5" />
                 <span>User</span>
@@ -105,7 +114,7 @@ export function AppSidebar() {
                 <SidebarMenuSub>
                   {fileUploadItems.map((item) => (
                     <SidebarMenuSubItem key={item.path}>
-                      <SidebarMenuSubButton asChild isActive={pathname === item.path}>
+                      <SidebarMenuSubButton asChild isActive={pathname === item.path} onClick={handleMenuItemClick}>
                         <Link href={item.path} className="flex items-center gap-2">
                           <item.icon className="h-4 w-4" />
                           <span>{item.name}</span>
@@ -119,7 +128,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === "/dashboard/tutorial"}>
+            <SidebarMenuButton asChild isActive={pathname === "/dashboard/tutorial"} onClick={handleMenuItemClick}>
               <Link href="/dashboard/tutorial">
                 <BookOpen className="h-5 w-5" />
                 <span>Tutorial Penggunaan</span>
@@ -128,7 +137,7 @@ export function AppSidebar() {
           </SidebarMenuItem>
 
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={pathname === "/dashboard/settings"}>
+            <SidebarMenuButton asChild isActive={pathname === "/dashboard/settings"} onClick={handleMenuItemClick}>
               <Link href="/dashboard/settings">
                 <Settings className="h-5 w-5" />
                 <span>Pengaturan</span>
